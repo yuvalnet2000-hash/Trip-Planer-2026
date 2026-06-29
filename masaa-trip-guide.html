@@ -440,8 +440,14 @@ const root = ReactDOM.createRoot(document.getElementById('root'));
 // המתן לתמונות לפני הרנדור הראשון
 Promise.all(
   ['images_1.json','images_2.json','images_3.json','images_4.json']
-  .map(f=>fetch(f).then(r=>r.json()).then(d=>Object.assign(IMGS,d)).catch(()=>{}))
-).finally(()=>{ root.render(<App />); });
+  .map(f=>fetch(f).then(r=>r.json()).then(d=>{
+    Object.assign(IMGS,d);
+    console.log('נטען:', f, 'מפתחות:', Object.keys(d).length);
+  }).catch(e=>console.error('שגיאה:', f, e)))
+).then(()=>{
+  console.log('סה"כ תמונות:', Object.keys(IMGS).length, 'מפתח ראשון:', Object.keys(IMGS)[0]);
+  root.render(<App />);
+}).catch(e=>{ console.error('שגיאה כללית:', e); root.render(<App />); });
 </script>
 </body>
 </html>
