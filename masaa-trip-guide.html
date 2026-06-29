@@ -370,7 +370,7 @@ function App() {
       (d.stops||[]).some(s => (s.displayName||s.name).toLowerCase().includes(q)||(s.note||"").toLowerCase().includes(q));
   });
 
-  const totalStops = days.reduce((a,d)=>a+(d.stops?.length||0),0);
+  const totalStops = getDays().reduce((a,d)=>a+(d.stops?.length||0),0);
 
   return (
     <div style={{minHeight:"100vh",background:"linear-gradient(135deg,#0f172a 0%,#1e293b 100%)",fontFamily:"'Segoe UI',Arial,sans-serif",direction:"rtl"}}>
@@ -437,19 +437,25 @@ function App() {
 }
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
-// רנדר ראשוני מיידי - ללא תמונות (gradients)
-root.render(<App />);
-// טעינת תמונות ברקע - re-render אחרי
-console.log('מתחיל טעינת תמונות...');
+
+// Loading screen
+root.render(
+  <div style={{minHeight:'100vh',background:'linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:20}}>
+    <div style={{fontSize:48}}>✈️</div>
+    <div style={{color:'#fff',fontSize:22,fontWeight:700,fontFamily:'Segoe UI,Arial,sans-serif'}}>מסע 2026</div>
+    <div style={{width:48,height:48,border:'4px solid rgba(255,255,255,0.2)',borderTop:'4px solid #fff',borderRadius:'50%',animation:'spin 0.8s linear infinite'}}/>
+    <div style={{color:'rgba(255,255,255,0.7)',fontSize:14,fontFamily:'Segoe UI,Arial,sans-serif'}}>טוען תמונות...</div>
+    <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
+  </div>
+);
+
+// טעינת תמונות - render אחרי
 const imgFiles = ['images_1.json','images_2.json','images_3.json','images_4.json'];
-const imgPromises = imgFiles.map(f => {
-  return fetch(f)
-    .then(r => r.json())
-    .then(d => { Object.assign(IMGS, d); console.log('נטען:', f, Object.keys(d).length, 'תמונות'); })
-    .catch(e => console.error('שגיאה בטעינה:', f, e.message));
-});
+const imgPromises = imgFiles.map(f =>
+  fetch(f).then(r => r.json()).then(d => Object.assign(IMGS, d)).catch(e => console.error('שגיאה:', f, e.message))
+);
 Promise.all(imgPromises).then(() => {
-  console.log('סה"כ:', Object.keys(IMGS).length, 'תמונות. מרנדר מחדש...');
+  console.log('תמונות נטענו:', Object.keys(IMGS).length, '. מרנדר...');
   root.render(<App />);
 });
 </script>
