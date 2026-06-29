@@ -437,18 +437,19 @@ function App() {
 }
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
-// המתן לתמונות לפני הרנדור הראשון
+// רנדר ראשוני מיידי - ללא תמונות (gradients)
+root.render(<App />);
+// טעינת תמונות ברקע - re-render אחרי
 console.log('מתחיל טעינת תמונות...');
 const imgFiles = ['images_1.json','images_2.json','images_3.json','images_4.json'];
 const imgPromises = imgFiles.map(f => {
-  console.log('מנסה לטעון:', f);
   return fetch(f)
-    .then(r => { console.log('תגובה:', f, r.status); return r.json(); })
+    .then(r => r.json())
     .then(d => { Object.assign(IMGS, d); console.log('נטען:', f, Object.keys(d).length, 'תמונות'); })
     .catch(e => console.error('שגיאה בטעינה:', f, e.message));
 });
 Promise.all(imgPromises).then(() => {
-  console.log('סה"כ:', Object.keys(IMGS).length, 'תמונות. מרנדר...');
+  console.log('סה"כ:', Object.keys(IMGS).length, 'תמונות. מרנדר מחדש...');
   root.render(<App />);
 });
 </script>
