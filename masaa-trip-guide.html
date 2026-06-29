@@ -254,17 +254,7 @@ function StopCard({ stop }) {
   const [tried, setTried] = React.useState(false);
   const [imgError, setImgError] = React.useState(false);
 
-  const loadImage = React.useCallback(async () => {
-    if (tried) return;
-    setTried(true);
-    setLoading(true);
-    const url = await fetchStopImage(stop.name);
-    setImgUrl(url);
-    setLoading(false);
-  }, [stop.name, tried]);
-
-  // Auto-fetch when card is rendered
-  React.useEffect(() => { loadImage(); }, []);
+  // API fetch disabled - using local images only
 
   const [g1,g2] = GRAD[stop.imgType||"city"]||GRAD.city;
   const icon = ICON[stop.imgType||"city"]||"📍";
