@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>מסע — טיוואן + יפן 2026</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.22.9/babel.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; direction: rtl; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  input { direction: rtl; }
+  a { text-decoration: none; }
+  button { font-family: inherit; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+
+const IMGS = window.__IMGS__ || {};
+// תמונות נטענות מ-images.json
+if (!window.__IMGS__) {
+  fetch('images.json').then(r=>r.json()).then(d=>{
+    Object.assign(IMGS, d);
+    // רנדר מחדש
+    if (window.__rerender__) window.__rerender__();
+  });
+};
+
+// Gradient fallbacks while images load / if they fail
+const GRAD = {
+  city:["#667eea","#764ba2"], market:["#f093fb","#f5576c"],
+  nature:["#4facfe","#00f2fe"], mountain:["#43e97b","#38f9d7"],
+  castle:["#fa709a","#fee140"], temple:["#a18cd1","#fbc2eb"],
+  beach:["#0093E9","#80D0C7"], waterfall:["#96fbc4","#f9f586"],
+  lake:["#89f7fe","#66a6ff"], village:["#fddb92","#d1fdff"],
+  festival:["#ff9a9e","#fecfef"], ropeway:["#a1c4fd","#c2e9fb"],
+  hotspring:["#ffecd2","#fcb69f"], forest:["#d4fc79","#96e6a1"],
+  night:["#30cfd0","#330867"], rafting:["#43e97b","#38f9d7"],
+  cliffs:["#c2e9fb","#a1c4fd"], deer:["#ffeaa7","#dfe6e9"],
+};
+const ICON = {
+  city:"🏙️", market:"🛒", nature:"🌿", mountain:"⛰️", castle:"🏯",
+  temple:"⛩️", beach:"🏖️", waterfall:"💧", lake:"🏞️", village:"🏘️",
+  festival:"🎆", ropeway:"🚡", hotspring:"♨️", forest:"🌲",
+  night:"🌃", rafting:"🛶", cliffs:"🌊", deer:"🦌",
+};
+
+// Fetch real photo URL for a stop name using Anthropic API + web_search
+async function fetchStopImage(stopName) {
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-6",
+        max_tokens: 200,
+        tools: [{ type: "web_search_20250305", name: "web_search" }],
+        system: `You find a single photo URL for a tourist attraction. 
+Search for the attraction and return ONLY a raw JSON object with one key "url" containing a direct image URL (jpg/png/webp) from Wikimedia Commons or a major travel site. 
+The URL must end with an image extension or contain /photos/. 
+Return ONLY valid JSON like: {"url":"https://..."} — no markdown, no explanation.`,
+        messages: [{ role: "user", content: `Find one good photo URL for: ${stopName}` }],
+      }),
+    });
+    const data = await res.json();
+    // Extract text from all content blocks
+    const text = (data.content || [])
+      .filter(b => b.type === "text")
+      .map(b => b.text)
+      .join("");
+    // Try to parse JSON from the response
+    const match = text.match(/\{[^}]*"url"\s*:\s*"([^"]+)"[^}]*\}/);
+    if (match) return match[1];
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+const days = [
+  { date:"2026-07-10", label:"10 יולי", city:"תל אביב ← דובאי ← בנגקוק", country:"🛫", flag:"🇮🇱", gradType:"city", note:"טיסה FZ1082 | יציאה 15:50, הגעה למחרת 11:25", stops:[] },
+  { date:"2026-07-11", label:"11 יולי", city:"בנגקוק", country:"תאילנד", flag:"🇹🇭", gradType:"city", hotel:"Asia Hotel Bangkok", stops:[
+    { img: IMGS.mbk, name:"MBK Center Bangkok", displayName:"קניון MBK Center", note:"קניון ענק עם 7 קומות ואלפי חנויות", imgType:"market" },
+    { img: IMGS.song_wat, name:"Awakening Song Wat 2026 Bangkok", displayName:"Awakening Song Wat — פסטיבל אמנות רחוב", displayName:"שוק ורחובות בנגקוק", note:"טיול ראשוני בעיר לאחר הנחיתה", imgType:"city" },
+  ]},
+  // TAIWAN
+  { date:"2026-07-12", label:"12 יולי", city:"בנגקוק ← טאיפיי", country:"טיוואן", flag:"🇹🇼", gradType:"city", hotel:"Global Realm Boutique Hotel", note:"טיסה VZ568 | 09:10 ← 13:55", stops:[
+    { img: IMGS.elephant, name:"Elephant Mountain Taipei 101 view", displayName:"Elephant Mountain — הר הפיל", note:"עלייה 20 דקות, נוף פנורמי על טאיפיי 101", imgType:"mountain" },
+    { img: IMGS.taipei101, name:"Taipei 101 night skyline Taiwan", displayName:"שקיעה מול Taipei 101", note:"נקודת התצפית האיקונית מהר הפיל", imgType:"night" },
+  ]},
+  { date:"2026-07-13", label:"13 יולי", city:"טאיפיי", country:"טיוואן", flag:"🇹🇼", gradType:"city", hotel:"Global Realm Boutique Hotel", stops:[
+    { img: IMGS.dihua, name:"Dihua Street Taipei Taiwan", displayName:"Dihua Street — רחוב דיחואה", note:"רחוב מסחרי היסטורי מהמאה ה-19, עשבי מרפא ואומנות", imgType:"village" },
+    { img: IMGS.yangming, name:"Yangmingshan National Park Taiwan volcano", displayName:"Yangmingshan — פארק לאומי", note:"פארק עם מעיינות חמים, שבילי הליכה והר הגעש הגדול בטיוואן", imgType:"nature" },
+    { img: IMGS.qingtiangang, name:"Qingtiangang grassland Yangmingshan Taiwan", displayName:"Qingtiangang — מסלולי הליכה", note:"מדשאות ירוקות ורועי בקר — נוף אירופאי באמצע אסיה", imgType:"nature" },
+    { img: IMGS.ximending, name:"Ximending shopping district Taipei Taiwan", displayName:"Ximending — קניות ואוכל", note:"רובע הנוער של טאיפיי — שוק הלילה, אנימה ואופנה", imgType:"city" },
+    { img: IMGS.shilin, name:"Shilin Night Market Taipei Taiwan", displayName:"Shilin — שוק הלילה הגדול", note:"שוק לילה ענק עם מאות דוכני אוכל — חובה בטאיפיי", imgType:"night" },
+  ]},
+  { date:"2026-07-14", label:"14 יולי", city:"ג׳יאופן ואזור הצפון", country:"טיוואן", flag:"🇹🇼", gradType:"waterfall", hotel:"Global Realm Boutique Hotel (Jiufen)", note:"🚗 איסוף רכב 08:00", stops:[
+    { img: IMGS.golden_waterfall, name:"Golden Waterfall Jinguashi Taiwan 黃金瀑布", displayName:"Golden Waterfall — מפלי הזהב", note:"מפלים צבעוניים זהובים מאלמנטים מינרליים — נוף ייחודי בעולם", imgType:"waterfall" },
+    { img: IMGS.yin_yang, name:"Yin Yang Sea Jinguashi Taiwan 陰陽海", displayName:"Yin Yang Sea — ים יין-יאנג", note:"עצירת תצפית על הים הצהוב-כחול הייחודי בגלל הכרייה ההיסטורית", imgType:"beach" },
+    { img: IMGS.jiufen, name:"Jiufen Old Street lanterns Taiwan 九份老街", displayName:"Jiufen Old Street — ג׳יאופן", note:"העיר הנסתרת בהרים — מדרגות, פנסים אדומים ומסעדות תה עתיקות", imgType:"night" },
+  ]},
+  { date:"2026-07-15", label:"15 יולי", city:"חוף המזרח — הואליין", country:"טיוואן", flag:"🇹🇼", gradType:"cliffs", hotel:"Harmony Easy Stay", stops:[
+    { img: IMGS.qingshui, name:"Qingshui Cliffs Suhua Highway Taiwan 清水斷崖", displayName:"Qingshui Cliffs — צוקי צ׳ינגשואי", note:"צוקים אנכיים של 800 מטר הנופלים ישירות לאוקיינוס הפסיפי", imgType:"cliffs" },
+    { img: IMGS.dongdaemun, name:"Dongdamen Night Market Hualien Taiwan", displayName:"Dongdamen — שוק לילה הואליין", note:"שוק לילה ססגוני עם אוכל ילידי והופעות מוזיקה חי", imgType:"night" },
+  ]},
+  { date:"2026-07-16", label:"16 יולי", city:"פארק טרוקו + מזרח", country:"טיוואן", flag:"🇹🇼", gradType:"nature", hotel:"Traveller-Inn Tiehua", stops:[
+    { img: IMGS.taroko, name:"Taroko Gorge National Park Taiwan 太魯閣", displayName:"פארק טרוקו — Taroko Gorge", note:"ביקוע גרניט ירוק-כחול שחצב הנהר במשך מיליוני שנים — אחד מפלאי טיוואן", imgType:"nature" },
+    { img: IMGS.eternal_spring, name:"Eternal Spring Shrine Taroko Taiwan 長春祠", displayName:"Eternal Spring Shrine + Shakadang Trail", note:"מקדש זרימת מים נצחית בתוך מנהרה", imgType:"temple" },
+    { img: IMGS.zhiben, name:"Zhiben Hot Spring Taitung Taiwan 知本溫泉", displayName:"Zhiben Hot Springs — ז׳יבן", note:"מעיינות חמים ביערות ירוקים — אחד מאזורי המעיינות הטובים בטיוואן", imgType:"hotspring" },
+    { img: IMGS.tiehua, name:"Tiehua Music Village Taitung Taiwan 鐵花村", displayName:"Tiehua Music Village", note:"כפר אומנותי קטן עם מוזיקה חיה בשעות הערב", imgType:"village" },
+  ]},
+  { date:"2026-07-17", label:"17 יולי", city:"צ׳ישאנג + קנטינג", country:"טיוואן", flag:"🇹🇼", gradType:"nature", hotel:"Lang Qin Hai Inn", stops:[
+    { name:"Mr Brown Avenue Chishang rice fields Taiwan 伯朗大道", displayName:"Mr. Brown Avenue — שדות האורז", note:"שביל ציורי בין שדות אורז ירוקים עם הרים ברקע", img: IMGS.mr_brown, imgType:"nature" },
+    { img: IMGS.kenting_beach, name:"Kenting beach Taiwan national park 墾丁", displayName:"קנטינג — חוף דרום טיוואן", note:"חופי שחייה, פארק לאומי וחיי לילה קלילים", imgType:"beach" },
+    { img: IMGS.kenting_night, name:"Kenting Night Market Taiwan street food 墾丁夜市", displayName:"שוק לילה קנטינג", note:"קילומטר שלם של דוכני אוכל פירות ים וקינוחים", imgType:"night" },
+  ]},
+  { date:"2026-07-18", label:"18 יולי", city:"הדרום — טאינאן", country:"טיוואן", flag:"🇹🇼", gradType:"castle", hotel:"LIHO Hotel Tainan", stops:[
+    { img: IMGS.eluanbi, name:"Eluanbi Lighthouse Kenting Taiwan 鵝鑾鼻燈塔", displayName:"Eluanbi Lighthouse — נקודה הדרומית", note:"המגדלור הדרומי ביותר בטיוואן", imgType:"beach" },
+    { img: IMGS.longpan, name:"Longpan Park green cliffs sea Kenting Taiwan", displayName:"Longpan Park — צוקים ירוקים", note:"מדשאה ירוקה על גבי צוקים מעל הים — נוף דרמטי ומרהיב", imgType:"cliffs" },
+    { img: IMGS.fort_zeelandia, name:"Fort Zeelandia Anping Tainan Taiwan 安平古堡", displayName:"Fort Zeelandia — מצודה הולנדית", note:"מצודה הולנדית משנת 1624 — לב ההיסטוריה הקולוניאלית של טיוואן", imgType:"castle" },
+    { img: IMGS.chikan, name:"Chihkan Tower Tainan Taiwan 赤崁樓", displayName:"Chihkan Tower — מגדל צ׳יהקאן", note:"מבצר משנת 1653 בלב טאינאן ההיסטורית", imgType:"castle" },
+    { img: IMGS.shennong, name:"Shennong Street Tainan Taiwan 神農街", displayName:"Shennong Street — רחוב העתיקות", note:"רחוב קטן ורומנטי עם פנסים ותמציות עשבי מרפא", imgType:"village" },
+  ]},
+  { date:"2026-07-19", label:"19 יולי", city:"אגם השמש והירח", country:"טיוואן", flag:"🇹🇼", gradType:"lake", hotel:"Sun Moon Lake Island Heart", stops:[
+    { img: IMGS.sun_moon_lake, name:"Sun Moon Lake Taiwan 日月潭", displayName:"Sun Moon Lake — אגם השמש והירח", note:"האגם הגדול ביותר בטיוואן — נופים מיסטיים בבוקר ושלוות ערב", imgType:"lake" },
+    { img: IMGS.wen_wu, name:"Wenwu Temple Sun Moon Lake Taiwan 文武廟", displayName:"Wen Wu Temple — מקדש ון-וו", note:"מקדש ענק ומרהיב על שפת האגם", imgType:"temple" },
+    { img: IMGS.ita_thao, name:"Ita Thao village Sun Moon Lake Taiwan 伊達邵", displayName:"כפר Ita Thao — כפר ילידי", note:"כפר של ילידי Thao על שפת האגם — מסורות, אוכל ושוק קטן", imgType:"village" },
+    { img: IMGS.bike_lake, name:"Sun Moon Lake cycling bike trail Taiwan", displayName:"רכיבה סביב האגם", note:"מסלול אופניים של 33 ק״מ סביב האגם", imgType:"lake" },
+  ]},
+  { date:"2026-07-20", label:"20 יולי", city:"טאיצ׳ונג", country:"טיוואן", flag:"🇹🇼", gradType:"city", hotel:"Chance Hotel", stops:[
+    { img: IMGS.rainbow, name:"Rainbow Village Taichung Taiwan 彩虹眷村", displayName:"Rainbow Village — כפר הקשת", note:"כפר צבעוני שצייר חייל קשיש יחידי — אחד מהמקומות הפוטוגנים בטיוואן", imgType:"village" },
+    { img: IMGS.gaomei, name:"Gaomei Wetlands sunset wind turbines Taichung Taiwan 高美濕地", displayName:"Gaomei Wetlands — שקיעה בשטחי הביצה", note:"טורבינות רוח ענקיות ושמיים כתומים בשקיעה", imgType:"nature" },
+  ]},
+  { date:"2026-07-21", label:"21 יולי", city:"חזרה לטאיפיי", country:"טיוואן", flag:"🇹🇼", gradType:"night", hotel:"Global Realm Boutique Hotel", note:"🚗 החזרת הרכב 11:00", stops:[
+    { img: IMGS.ningxia, name:"Ningxia Night Market Taipei Taiwan 寧夏夜市", displayName:"Ningxia Night Market — שוק לילה", note:"שוק לילה קטן ואותנטי של מקומיים — פחות תיירים, יותר טעם", imgType:"night" },
+  ]},
+  // OSAKA
+  { date:"2026-07-22", label:"22 יולי", city:"טיוואן ← אוסקה", country:"יפן", flag:"🇯🇵", gradType:"night", hotel:"Regale Namba Annex", note:"טיסה D7378 | 15:40 ← 19:30", stops:[
+    { img: IMGS.dotonbori, name:"Dotonbori canal neon Osaka Japan 道頓堀", displayName:"Dotonbori — לב אוסקה", note:"תעלה מוארת בניאון, שלטי ענק, שיפודי תמנון ואיזאקאיה", imgType:"night" },
+    { img: IMGS.shinsaibashi, name:"Shinsaibashi shopping street Osaka Japan 心斎橋", displayName:"Shinsaibashi — רחוב קניות", note:"הרחוב המסחרי הארוך ביותר באוסקה", imgType:"market" },
+  ]},
+  { date:"2026-07-23", label:"23 יולי", city:"אוסקה", country:"יפן", flag:"🇯🇵", gradType:"castle", hotel:"Regale Namba Annex", stops:[
+    { img: IMGS.osaka_castle, name:"Osaka Castle Japan 大阪城", displayName:"Osaka Castle — טירת אוסקה", note:"טירה מפוארת משנת 1597 עם גנים מרהיבים ומוזיאון היסטורי", imgType:"castle" },
+    { img: IMGS.kuromon, name:"Kuromon Ichiba Market Osaka Japan 黒門市場", displayName:"Kuromon Ichiba Market — שוק קורומון", note:'״המטבח של אוסקה״ — שוק מקורה עם מאכלי ים, ואגיו', imgType:"market" },
+    { img: IMGS.shinsekai2, name:"Shinsekai Tsutenkaku tower Osaka Japan 新世界", displayName:"Shinsekai + Tsutenkaku", note:"רובע 1912 עם מגדל 103 מטר — ה-DNA האותנטי של אוסקה", imgType:"city" },
+    { img: IMGS.abeno, name:"Abeno Harukas skyscraper Osaka Japan 天王寺", displayName:"Abeno Harukas — תצפית 300 מ׳", note:"המגדל השני בגובהו ביפן — תצפית בקומה 60", imgType:"city" },
+    { img: IMGS.hozenji, name:"Hozenji Yokocho alley Osaka Japan 法善寺横丁", displayName:"Hozenji Yokocho — סמטת המקדש", note:"סמטת אבן צרה ורומנטית עם מקדש קטן ומסעדות עתיקות", imgType:"temple" },
+  ]},
+  { date:"2026-07-24", label:"24 יולי", city:"אוסקה — הרים + עיר", country:"יפן", flag:"🇯🇵", gradType:"mountain", hotel:"Regale Namba Annex", stops:[
+    { img: IMGS.mount_kongo, name:"Mount Kongo Osaka Nara Japan 金剛山", displayName:"Mount Kongō — הר קונגו", note:"הר 1,125 מטר על גבול נארה-אוסקה — טיפוס עם רכבל ונוף עצום", imgType:"mountain" },
+    { img: IMGS.usj, name:"Universal Studios Japan Osaka ユニバーサル", displayName:"Universal Studios Japan", note:"פארק שעשועים עולמי עם האריי פוטר ומינאורים", imgType:"festival" },
+    { img: IMGS.hep_five, name:"HEP Five Ferris Wheel Umeda Osaka Japan", displayName:"HEP Five Ferris Wheel — גלגל ענק", note:"גלגל ענק אדום על גג קניון — תצפית על אוסקה בלילה", imgType:"night" },
+    { img: IMGS.umeda_sky, name:"Umeda Sky Building observation Osaka Japan 梅田スカイビル", displayName:"Umeda Sky Building — תצפית שמים", note:"שני גורדי שחקים מחוברים בגג — אחת התצפיות הדרמטיות ביפן", imgType:"city" },
+  ]},
+  { date:"2026-07-25", label:"25 יולי", city:"פסטיבל טנג׳יאין — אוסקה", country:"יפן", flag:"🇯🇵", gradType:"festival", hotel:"Regale Namba Annex", stops:[
+    { img: IMGS.tenmangu, name:"Osaka Tenmangu Shrine Japan 大阪天満宮", displayName:"Osaka Tenmangu Shrine", note:"מקדש שינטו עתיק — מרכז פסטיבל טנג׳יאין האגדי", imgType:"temple" },
+    { img: IMGS.kema_park, name:"Tenjin Matsuri festival boats fireworks Osaka Japan 天神祭", displayName:"Kema Sakuranomiya Park ⭐", note:"המקום הטוב ביותר לצפייה! להגיע עד 16:00. סירות מסורתיות + זיקוקים ענקיים", imgType:"festival" },
+  ]},
+  { date:"2026-07-26", label:"26 יולי", city:"אוסקה — יער + קניות", country:"יפן", flag:"🇯🇵", gradType:"forest", hotel:"Regale Namba Annex", stops:[
+    { img: IMGS.minoh, name:"Minoh Waterfall Osaka Japan 箕面大滝", displayName:"Minoh Falls — מפלי מינוח", note:"הליכה 3 ק״מ ביער עצים ענקיים למפל של 33 מטר", imgType:"waterfall" },
+    { img: IMGS.namba_parks, name:"Namba Parks garden Osaka Japan なんばパークス", displayName:"Namba Parks — פארק בתוך קניון", note:"קניון ייחודי עם גנים מדורגים וצמחייה על גגות הקניון", imgType:"nature" },
+    { img: IMGS.america_mura, name:"America-mura Osaka Japan アメリカ村", displayName:"America-mura — כפר אמריקה", note:"רובע נוער עם בגדי וינטג׳, גרפיטי, בתי קפה ומועדוני היפ-הופ", imgType:"city" },
+  ]},
+  // KYOTO
+  { date:"2026-07-27", label:"27 יולי", city:"אוסקה ← קיוטו", country:"יפן-קיוטו", flag:"🇯🇵", gradType:"market", hotel:"Travelodge Kyoto Shijo-Kawaramachi", note:"רכבת Midosuji → Hankyu Limited Express", stops:[
+    { img: IMGS.nishiki, name:"Nishiki Market Kyoto Japan 錦市場", displayName:"Nishiki Market — שוק ניישיקי", note:"שוק קיוטו בן 400 שנה — ״המטבח של קיוטו״ עם דוכנים אינסופיים", imgType:"market" },
+    { img: IMGS.pontocho, name:"Pontocho alley Kyoto Japan night 先斗町", displayName:"Pontocho — סמטת הנהר", note:"סמטה צרה ומאגית לצד נהר קאמו — מסעדות יפניות על יציעי נהר", imgType:"night" },
+  ]},
+  { date:"2026-07-28", label:"28 יולי", city:"קורמה — הרים וטבע", country:"יפן-קיוטו", flag:"🇯🇵", gradType:"forest", hotel:"Travelodge Kyoto Shijo-Kawaramachi", stops:[
+    { img: IMGS.kurama, name:"Kurama Temple forest Kyoto Japan 鞍馬寺", displayName:"Kuramadera Temple — מקדש קורמה", note:"הליכה ביער הרים מיסטי למקדש בודהיסטי עתיק", imgType:"forest" },
+    { img: IMGS.kawadoko, name:"Kawadoko riverside restaurant Kibune Kyoto Japan 川床", displayName:"Kawadoko — מסעדה על הנהר", note:"ארוחה על פלטפורמות עץ מעל מי הנהר הצלולים — חוויית קיץ יפנית", imgType:"nature" },
+  ]},
+  { date:"2026-07-29", label:"29 יולי", city:"נארה", country:"יפן-קיוטו", flag:"🇯🇵", gradType:"deer", hotel:"Travelodge Kyoto Shijo-Kawaramachi", stops:[
+    { img: IMGS.nara_park, name:"Nara Park deer Japan 奈良公園", displayName:"Nara Park — פארק הצבאים", note:"מאות צבאים חופשיים מסתובבים ואוכלים מכפות ידיים — חוויה שאין בשום מקום אחר", imgType:"deer" },
+    { img: IMGS.kasuga, name:"Kasuga Taisha shrine lanterns Nara Japan 春日大社", displayName:"Kasuga Taisha — מקדש קאסוגה", note:"מקדש שינטו משנת 768 עם אלפי פנסי אבן ועמודים אדומים", imgType:"temple" },
+    { img: IMGS.kinkakuji, name:"Kinkakuji Golden Pavilion Kyoto Japan 金閣寺", displayName:"Kinkaku-ji — מקדש הזהב", note:"מקדש מצופה זהב הנשקף בבריכת ההשתקפות — אחד המקומות הצלומים ביותר בעולם", imgType:"temple" },
+  ]},
+  { date:"2026-07-30", label:"30 יולי", city:"אראשיאמה + פושימי", country:"יפן-קיוטו", flag:"🇯🇵", gradType:"forest", hotel:"Travelodge Kyoto Shijo-Kawaramachi", stops:[
+    { img: IMGS.hozugawa, name:"Hozugawa River rafting Arashiyama Kyoto Japan 保津川下り", displayName:"Hozugawa River — רפטינג", note:"יציאה מוקדמת לרפטינג בנהר הוזו — 16 ק״מ בין צוקים ויערות", imgType:"rafting" },
+    { img: IMGS.arashiyama, name:"Arashiyama Bamboo Grove Kyoto Japan 竹林", displayName:"יער הבמבוק — Arashiyama", note:"מנהרת במבוק ירוקה שמשתנה עם הרוח — תמונה אייקונית של קיוטו", imgType:"forest" },
+    { img: IMGS.monkey_park, name:"Arashiyama Monkey Park Iwatayama Kyoto Japan", displayName:"Monkey Park Iwatayama", note:"עלייה לפסגת הר אראשיאמה לצפייה בקופי מקוק ונוף על קיוטו", imgType:"mountain" },
+    { img: IMGS.fushimi, name:"Fushimi Inari Taisha torii gates Kyoto Japan 伏見稲荷大社", displayName:"Fushimi Inari — שערים אדומים", note:"אלפי שערי טורי כתומים-אדומים מטפסים על הר אינארי — חובה בקיוטו", imgType:"temple" },
+    { img: IMGS.gion, name:"Gion district Kyoto Japan night 祇園", displayName:"Gion — רובע הגישות", note:"רחובות מדינת אדו עם בתי עץ וחנויות תה", imgType:"night" },
+  ]},
+  { date:"2026-07-31", label:"31 יולי", city:"הר היאיי + אגם ביווה", country:"יפן-קיוטו", flag:"🇯🇵", gradType:"lake", hotel:"Travelodge Kyoto Shijo-Kawaramachi", stops:[
+    { img: IMGS.sakamoto_cable, name:"Sakamoto Cable Car Lake Biwa Japan 坂本ケーブル", displayName:"Sakamoto Cableway — הרכבל הארוך", note:"הרכבל הארוך ביותר ביפן — נוף פנורמי של אגם ביווה הכחול", imgType:"ropeway" },
+    { img: IMGS.enryakuji, name:"Enryakuji Temple Mount Hiei Kyoto Japan 延暦寺", displayName:"Enryaku-ji — מקדש ענק ביער", note:"קומפלקס מקדשים עתיק בין ארזים ענקיים בגובה 848 מ׳", imgType:"forest" },
+    { img: IMGS.sakamoto_town, name:"Sakamoto town stone walls canal Shiga Japan", displayName:"עיירת סאקמוטו", note:"תעלות מים, חומות אבן ומסעדות עם טופו מיוחד לאזור", imgType:"village" },
+    { img: IMGS.ukimido, name:"Ukimido floating temple Lake Biwa Japan 浮御堂", displayName:"Ukimido Temple — מקדש על המים", note:"מקדש קסום הבנוי על כלונסאות בתוך אגם ביווה", imgType:"lake" },
+  ]},
+  { date:"2026-08-01", label:"1 אוגוסט", city:"קיוטו — היסטוריה", country:"יפן-קיוטו", flag:"🇯🇵", gradType:"temple", hotel:"Travelodge Kyoto Shijo-Kawaramachi", stops:[
+    { img: IMGS.kiyomizu, name:"Kiyomizudera Temple wooden stage Kyoto Japan 清水寺", displayName:"Kiyomizu-dera — תצפית קיומיזו", note:"מקדש בודהיסטי על הר אוטובה — המרפסת בגובה 13 מ׳ עם נוף לכל קיוטו", imgType:"temple" },
+    { img: IMGS.sannenzaka, name:"Sannenzaka Ninenzaka stone path Kyoto Japan 産寧坂", displayName:"Sannenzaka + Ninenzaka", note:"מדרכות אבן ישנות בין בתי עץ — האזור הצלום ביותר בקיוטו", imgType:"village" },
+    { name:"Pontocho Gion night lanterns Kyoto Japan", displayName:"Pontocho + Gion בלילה", note:"הערב הכי יפה בקיוטו — סמטאות אדו בתאורת פנסים", imgType:"night" },
+  ]},
+  // ALPS
+  { date:"2026-08-02", label:"2 אוגוסט", city:"קנאזאווה + שיראקאוואגו", country:"אלפים", flag:"🇯🇵", gradType:"village", hotel:"Chisun Grand Takayama", note:"🚗 איסוף רכב קיוטו 08:00", stops:[
+    { img: IMGS.kenrokuen, name:"Kenrokuen Garden Kanazawa Japan 兼六園", displayName:"גן קנרוקואן + מצודת קנאזאווה", note:"אחד משלושת הגנים הגדולים של יפן — תכנון מדוקדק ועדין", imgType:"nature" },
+    { img: IMGS.shirakawago, name:"Shirakawago thatched roof village Japan UNESCO 白川郷", displayName:"שיראקאוואגו — כפר גאשו-זוקורי", note:"כפר אונסקו עם בתי קש ישנים בזווית 60° — נוף מהאגדות", imgType:"village" },
+    { img: IMGS.shiroyama, name:"Shirakawago observation deck viewpoint Japan", displayName:"Shiroyama — מגדל תצפית", note:"עלייה 10 דקות לנוף הקלאסי על גגות הכפר עם ההרים ברקע", imgType:"mountain" },
+  ]},
+  { date:"2026-08-03", label:"3 אוגוסט", city:"טאקאיאמה", country:"אלפים", flag:"🇯🇵", gradType:"village", hotel:"Chisun Grand Takayama", stops:[
+    { img: IMGS.jinya_market, name:"Jinya-mae morning market Takayama Japan 陣屋朝市", displayName:"שוק בוקר Jinya-mae", note:"שוק בוקר יומי של חקלאים ואומנים מקומיים מזה 300 שנה", imgType:"market" },
+    { img: IMGS.takayama_jinya, name:"Takayama Jinya government house Japan 高山陣屋", displayName:"Takayama Jinya — מטה ממשל", note:"המטה הממשלתי היחיד ששרד מתקופת אדו — אוסף ייחודי", imgType:"castle" },
+    { img: IMGS.sanmachi, name:"Sanmachi Suji old town Takayama Japan 三町筋", displayName:"Sanmachi Suji — רחוב אדו", note:"שלושה רחובות ישנים עם יקבי סאקה, בתי עץ וחנויות קלאסיות", imgType:"village" },
+    { img: IMGS.hida_folk, name:"Hida Folk Village open air museum Takayama Japan 飛騨の里", displayName:"Hida Folk Village — כפר פתוח", note:"כפר מוזיאוני עם בתי Gassho מקוריים שהועברו ממקומות שונים", imgType:"village" },
+  ]},
+  { date:"2026-08-04", label:"4 אוגוסט", city:"אוקוהידה + רכבל", country:"אלפים", flag:"🇯🇵", gradType:"hotspring", hotel:"Chisun Grand Takayama", stops:[
+    { img: IMGS.okuhida, name:"Okuhida Onsen hot spring Japan Alps 奥飛騨温泉郷", displayName:"אוקוהידה — אונסן אלפיני", note:"מעיינות חמים בלב הרי האלפים היפניים — פסגות שלגיות ברקע", imgType:"hotspring" },
+    { img: IMGS.shinhotaka, name:"Shinhotaka Ropeway Japan Alps panorama 新穂高ロープウェイ", displayName:"Shinhotaka Ropeway — רכבל דו-קומתי", note:"רכבל דו-קומתי עד 2,156 מ׳ — פנורמה 360° על הרי הוטאקה", imgType:"ropeway" },
+  ]},
+  { date:"2026-08-05", label:"5 אוגוסט", city:"שמורת קאמיקוצ׳י", country:"אלפים", flag:"🇯🇵", gradType:"lake", hotel:"Chisun Grand Takayama", stops:[
+    { img: IMGS.kamikochi, name:"Kamikochi alpine valley Japan Alps 上高地", displayName:"Kamikochi — שמורת הטבע", note:"אחד מהמקומות הפראיים והיפים ביפן — עמק אלפיני ענק הסגור לרכב פרטי", imgType:"nature" },
+    { img: IMGS.taisho_pond, name:"Taisho Pond dead trees Kamikochi Japan 大正池", displayName:"Taisho Pond — בריכת טאישו", note:"גזעי עצים מתים שקועים במים וצמרות הרי הוטאקה ברקע", imgType:"lake" },
+    { img: IMGS.myojin, name:"Myojin Pond Hotaka Shrine Kamikochi Japan 明神池", displayName:"Myojin Pond — בריכת מיוג׳ין", note:"מסלול 3 שעות לאגם מיסטי וצלול עם מקדש שינטו על שפתו", imgType:"lake" },
+    { img: IMGS.matsumoto2, name:"Matsumoto Castle black Japan 松本城", displayName:"מצודת מאצומוטו", note:"אחת מ-12 מצודות יפן המקוריות — שחורה, ייחודית ושלמה", imgType:"castle" },
+  ]},
+  { date:"2026-08-06", label:"6 אוגוסט", city:"נוריקורה + מאצומוטו", country:"אלפים", flag:"🇯🇵", gradType:"mountain", hotel:"Hotel Morschein", stops:[
+    { img: IMGS.norikura, name:"Norikura Kogen highland plateau Japan Alps 乗鞍高原", displayName:"Norikura Kogen — רמת נוריקורה", note:"רמת הרים עם אחו פרחים ענק — אוטובוס ל-Tatamidaira בגובה 2,700 מ׳", imgType:"mountain" },
+    { name:"Matsumoto Castle black Japan 松本城", displayName:"מצודת מאצומוטו", note:"מצודת ״עורב שחור״ מהמאה ה-16 — אחת מ-12 המקוריות של יפן", imgType:"castle" },
+    { img: IMGS.nawate, name:"Nawatedori Nakamachi Matsumoto Japan night 縄手通り", displayName:"Nawate-dori + Nakamachi בלילה", note:"רחובות קסומים לאורך נהר קטן — אומנות, בתי קפה ומסעדות", imgType:"night" },
+  ]},
+  { date:"2026-08-07", label:"7 אוגוסט", city:"צומאגו + אינויאמה ← אוסקה", country:"אלפים", flag:"🇯🇵", gradType:"village", hotel:"— החזרת רכב אוסקה 17:30", note:"🚗 החזרת רכב Toyota Namba Terminal עד 17:30", stops:[
+    { img: IMGS.tsumago, name:"Tsumago-juku preserved post town Japan 妻籠宿", displayName:"Tsumago-juku — עיירת אדו", note:"עיירת תחנה ישנה השמורה בצורה מושלמת — כאילו הזמן עצר ב-1600", imgType:"village" },
+    { img: IMGS.inuyama, name:"Inuyama Castle Japan 犬山城", displayName:"מצודת אינויאמה", note:"אחת ממצודות ה-12 המקוריות — הקדומות ביותר ביפן", imgType:"castle" },
+  ]},
+  { date:"2026-08-08", label:"8 אוגוסט", city:"אוסקה ← בנגקוק", country:"תאילנד", flag:"🇹🇭", gradType:"city", hotel:"Asia Hotel Bangkok", note:"טיסה VZ821 | 08:55 ← 12:55", stops:[] },
+  { date:"2026-08-09", label:"9 אוגוסט", city:"בנגקוק", country:"תאילנד", flag:"🇹🇭", gradType:"city", hotel:"Asia Hotel Bangkok", stops:[
+    { name:"Bangkok Thailand skyline Chao Phraya river", displayName:"יום חופשי בבנגקוק", note:"מנוחה, קניות אחרונות ואוכל תאילנדי לפני הטיסה הביתה", imgType:"city" },
+  ]},
+  { date:"2026-08-10", label:"10 אוגוסט", city:"בנגקוק ← דובאי ← ישראל 🏠", country:"🛬", flag:"🇮🇱", gradType:"city", note:"טיסה FZ1334 | יציאה 23:50, הגעה 08:45", stops:[] },
+];
+
+const countryColors = {
+  "תאילנד":    {bg:"#fdf4ff",border:"#ec4899",accent:"#db2777"},
+  "טיוואן":    {bg:"#ecfdf5",border:"#14b8a6",accent:"#0d9488"},
+  "יפן":       {bg:"#fff1f2",border:"#ef4444",accent:"#dc2626"},
+  "יפן-קיוטו": {bg:"#fffbeb",border:"#f59e0b",accent:"#d97706"},
+  "אלפים":     {bg:"#f0fdf4",border:"#10b981",accent:"#059669"},
+  "🛫":        {bg:"#eef2ff",border:"#6366f1",accent:"#4f46e5"},
+  "🛬":        {bg:"#eef2ff",border:"#6366f1",accent:"#4f46e5"},
+};
+
+const regionGroups = [
+  {label:"🇹🇭 בנגקוק",      dates:["2026-07-10","2026-07-11"],color:"#ec4899"},
+  {label:"🇹🇼 טיוואן",      dates:["2026-07-12","2026-07-13","2026-07-14","2026-07-15","2026-07-16","2026-07-17","2026-07-18","2026-07-19","2026-07-20","2026-07-21"],color:"#14b8a6"},
+  {label:"🇯🇵 אוסקה",       dates:["2026-07-22","2026-07-23","2026-07-24","2026-07-25","2026-07-26"],color:"#ef4444"},
+  {label:"🇯🇵 קיוטו",       dates:["2026-07-27","2026-07-28","2026-07-29","2026-07-30","2026-07-31","2026-08-01"],color:"#f59e0b"},
+  {label:"🏔️ אלפים יפניים", dates:["2026-08-02","2026-08-03","2026-08-04","2026-08-05","2026-08-06","2026-08-07"],color:"#10b981"},
+  {label:"🇹🇭 חזרה",        dates:["2026-08-08","2026-08-09","2026-08-10"],color:"#ec4899"},
+];
+
+// StopCard: shows gradient by default, fetches real image on mount
+function StopCard({ stop }) {
+  const [imgUrl, setImgUrl] = React.useState(null);
+  const [loading, setLoading] = React.useState(false);
+  const [tried, setTried] = React.useState(false);
+  const [imgError, setImgError] = React.useState(false);
+
+  const loadImage = React.useCallback(async () => {
+    if (tried) return;
+    setTried(true);
+    setLoading(true);
+    const url = await fetchStopImage(stop.name);
+    setImgUrl(url);
+    setLoading(false);
+  }, [stop.name, tried]);
+
+  // Auto-fetch when card is rendered
+  React.useEffect(() => { loadImage(); }, []);
+
+  const [g1,g2] = GRAD[stop.imgType||"city"]||GRAD.city;
+  const icon = ICON[stop.imgType||"city"]||"📍";
+
+  return (
+    <div style={{
+      background:"#fff", borderRadius:12, overflow:"hidden",
+      boxShadow:"0 2px 8px rgba(0,0,0,0.08)", border:"1px solid #f0f0f0",
+      transition:"transform 0.15s,box-shadow 0.15s",
+    }}
+      onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-3px)";e.currentTarget.style.boxShadow="0 8px 24px rgba(0,0,0,0.13)";}}
+      onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow="0 2px 8px rgba(0,0,0,0.08)";}}
+    >
+      <div style={{height:150,position:"relative",overflow:"hidden"}}>
+        {/* If we have a local base64 image, show it directly */}
+        {stop.img ? (
+          <img src={stop.img} alt={stop.displayName||stop.name}
+            style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover"}}
+          />
+        ) : (
+          <>
+            {/* Gradient fallback */}
+            <div style={{
+              position:"absolute",inset:0,
+              background:`linear-gradient(135deg,${g1} 0%,${g2} 100%)`,
+              display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:5,
+            }}>
+              {loading
+                ? <div style={{width:32,height:32,border:"3px solid rgba(255,255,255,0.4)",borderTop:"3px solid #fff",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
+                : <><span style={{fontSize:38}}>{icon}</span>
+                   <span style={{fontSize:10,fontWeight:700,color:"rgba(255,255,255,0.9)",textAlign:"center",padding:"0 8px",direction:"rtl",textShadow:"0 1px 3px rgba(0,0,0,0.3)",maxWidth:160}}>{stop.displayName||stop.name}</span>
+                  </>
+              }
+            </div>
+            {/* API-fetched photo overlaid when loaded */}
+            {imgUrl && !imgError && (
+              <img src={imgUrl} alt={stop.displayName||stop.name}
+                onError={()=>setImgError(true)}
+                style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover"}}
+              />
+            )}
+          </>
+        )}
+      </div>
+      <div style={{padding:"11px 13px"}}>
+        <div style={{fontWeight:700,fontSize:13,color:"#1e293b",marginBottom:3,direction:"rtl",lineHeight:1.4}}>{stop.displayName||stop.name}</div>
+        {stop.note && <div style={{fontSize:11,color:"#64748b",lineHeight:1.5,direction:"rtl"}}>{stop.note}</div>}
+      </div>
+    </div>
+  );
+}
+
+function DayGradBg({type="city"}) {
+  const [g1,g2] = GRAD[type]||GRAD.city;
+  return <div style={{position:"absolute",inset:0,zIndex:0,background:`linear-gradient(135deg,${g1}dd 0%,${g2}dd 100%)`}}/>;
+}
+
+function DayCard({day,isActive,onClick}) {
+  const theme = countryColors[day.country]||{bg:"#f8fafc",border:"#94a3b8",accent:"#64748b"};
+  const hasStops = day.stops && day.stops.length > 0;
+  return (
+    <div style={{marginBottom:12}}>
+      <div onClick={onClick} style={{
+        border:`2px solid ${isActive?theme.border:theme.border+"77"}`,
+        borderRadius:isActive?"14px 14px 0 0":14,
+        cursor:"pointer",overflow:"hidden",position:"relative",
+        minHeight:70,transition:"border-color 0.2s",
+      }}>
+        <DayGradBg type={day.gradType||"city"}/>
+        <div style={{position:"relative",zIndex:1,padding:"13px 16px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <span style={{fontSize:22}}>{day.flag}</span>
+            <div>
+              <div style={{fontWeight:800,fontSize:11,color:"rgba(255,255,255,0.75)",direction:"rtl",letterSpacing:0.5,textTransform:"uppercase"}}>{day.label}</div>
+              <div style={{fontWeight:700,fontSize:15,color:"#fff",direction:"rtl",textShadow:"0 1px 6px rgba(0,0,0,0.5)"}}>{day.city}</div>
+              {day.hotel && <div style={{fontSize:11,color:"rgba(255,255,255,0.7)",direction:"rtl"}}>🏨 {day.hotel}</div>}
+            </div>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            {hasStops && <span style={{background:"rgba(255,255,255,0.25)",backdropFilter:"blur(6px)",color:"#fff",borderRadius:20,padding:"3px 10px",fontSize:11,fontWeight:700,border:"1px solid rgba(255,255,255,0.35)"}}>{day.stops.length} עצירות</span>}
+            <span style={{color:"#fff",fontSize:20,transform:isActive?"rotate(180deg)":"",transition:"transform 0.25s",textShadow:"0 1px 4px rgba(0,0,0,0.5)"}}>▾</span>
+          </div>
+        </div>
+      </div>
+      {isActive && (
+        <div style={{background:theme.bg,border:`2px solid ${theme.border}`,borderTop:"none",borderRadius:"0 0 14px 14px",padding:14}}>
+          {day.note && <div style={{background:"rgba(255,255,255,0.85)",border:`1px solid ${theme.border}`,borderRadius:8,padding:"8px 12px",marginBottom:12,fontSize:12,color:theme.accent,fontWeight:600,direction:"rtl"}}>✈️ {day.note}</div>}
+          {hasStops
+            ? <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(185px,1fr))",gap:11}}>
+                {day.stops.map((stop,i) => <StopCard key={i} stop={stop}/>)}
+              </div>
+            : <div style={{textAlign:"center",color:"#94a3b8",fontSize:13,padding:"18px 0",direction:"rtl"}}>יום מעבר / טיסה</div>
+          }
+        </div>
+      )}
+    </div>
+  );
+}
+
+function App() {
+  const [view, setView] = React.React.useState("guide");
+  const [activeDay, setActiveDay] = React.React.useState(null);
+  const [activeRegion, setActiveRegion] = React.React.useState(null);
+  const [search, setSearch] = React.React.useState("");
+
+  const filteredDays = days.filter(d => {
+    const regionMatch = activeRegion===null || regionGroups[activeRegion].dates.includes(d.date);
+    if (!regionMatch) return false;
+    if (!search.trim()) return true;
+    const q = search.trim().toLowerCase();
+    return d.city.toLowerCase().includes(q) || (d.country||"").toLowerCase().includes(q) ||
+      (d.hotel||"").toLowerCase().includes(q) ||
+      (d.stops||[]).some(s => (s.displayName||s.name).toLowerCase().includes(q)||(s.note||"").toLowerCase().includes(q));
+  });
+
+  const totalStops = days.reduce((a,d)=>a+(d.stops?.length||0),0);
+
+  return (
+    <div style={{minHeight:"100vh",background:"linear-gradient(135deg,#0f172a 0%,#1e293b 100%)",fontFamily:"'Segoe UI',Arial,sans-serif",direction:"rtl"}}>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+      <div style={{background:"linear-gradient(135deg,#1e1b4b 0%,#312e81 50%,#1e3a5f 100%)",padding:"36px 24px 28px",textAlign:"center",position:"relative",overflow:"hidden"}}>
+        <div style={{position:"absolute",inset:0,backgroundImage:"radial-gradient(circle at 20% 50%,rgba(99,102,241,0.35) 0%,transparent 50%),radial-gradient(circle at 80% 20%,rgba(236,72,153,0.2) 0%,transparent 50%)"}}/>
+        <div style={{position:"relative"}}>
+          <div style={{fontSize:50,marginBottom:6}}>🌍</div>
+          <h1 style={{color:"#fff",fontSize:27,fontWeight:900,margin:"0 0 5px",letterSpacing:-0.5}}>טיול טיוואן + יפן 2026</h1>
+          <div style={{color:"#a5b4fc",fontSize:13,marginBottom:18}}>10 ביולי – 10 באוגוסט 2026 · 31 יום</div>
+          <div style={{display:"flex",gap:8,justifyContent:"center",marginBottom:18}}>
+            <button onClick={()=>setView("guide")} style={{padding:"8px 22px",borderRadius:25,fontWeight:700,fontSize:13,cursor:"pointer",border:"2px solid #6366f1",background:view==="guide"?"#6366f1":"transparent",color:view==="guide"?"#fff":"#a5b4fc",transition:"all 0.2s"}}>🖼️ מדריך תמונות</button>
+            <button onClick={()=>setView("nav")} style={{padding:"8px 22px",borderRadius:25,fontWeight:700,fontSize:13,cursor:"pointer",border:"2px solid #10b981",background:view==="nav"?"#10b981":"transparent",color:view==="nav"?"#fff":"#6ee7b7",transition:"all 0.2s"}}>🧭 ניווט מסע</button>
+          </div>
+          <div style={{display:"flex",gap:7,justifyContent:"center",flexWrap:"wrap"}}>
+            {["🇹🇭 בנגקוק","🇹🇼 טיוואן","🇯🇵 אוסקה","🇯🇵 קיוטו","🏔️ אלפים"].map((t,i)=>(
+              <span key={i} style={{background:"rgba(255,255,255,0.15)",color:"#e2e8f0",borderRadius:20,padding:"4px 11px",fontSize:12,fontWeight:600}}>{t}</span>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div style={{maxWidth:900,margin:"0 auto",padding:"20px 14px"}}>
+        {view==="nav" ? (
+          <div style={{textAlign:"center",padding:"40px 20px"}}>
+            <div style={{fontSize:52,marginBottom:16}}>🧭</div>
+            <div style={{color:"#e2e8f0",fontSize:18,fontWeight:700,marginBottom:8,direction:"rtl"}}>מסע — אפליקציית הניווט</div>
+            <div style={{color:"#94a3b8",fontSize:14,marginBottom:28,direction:"rtl"}}>פתח את PWA הניווט עם מפות, Waze ופירוט עצירות</div>
+            <a href="https://yuvalnet2000-hash.github.io/Trip-Planer-2026/trip-planner.html" target="_blank" rel="noopener noreferrer" style={{display:"inline-block",padding:"14px 36px",borderRadius:14,background:"linear-gradient(135deg,#10b981,#059669)",color:"#fff",fontWeight:800,fontSize:16,textDecoration:"none",boxShadow:"0 4px 20px rgba(16,185,129,0.4)"}}>פתח מסע 🚀</a>
+            <div style={{marginTop:20,color:"#64748b",fontSize:12}}>יפתח בלשונית חדשה</div>
+          </div>
+        ) : (
+          <>
+          <input value={search} onChange={e=>{setSearch(e.target.value);setActiveDay(null);}}
+            placeholder="🔍 חיפוש מקום, עיר, אטרקציה..."
+            style={{width:"100%",padding:"12px 16px",borderRadius:12,border:"2px solid #334155",background:"#1e293b",color:"#e2e8f0",fontSize:14,outline:"none",boxSizing:"border-box",direction:"rtl",marginBottom:14}}
+          />
+          <div style={{display:"flex",gap:7,flexWrap:"wrap",marginBottom:18}}>
+            <button onClick={()=>{setActiveRegion(null);setActiveDay(null);setSearch("");}} style={{padding:"6px 13px",borderRadius:20,border:`2px solid ${activeRegion===null?"#6366f1":"#334155"}`,background:activeRegion===null?"#6366f1":"transparent",color:activeRegion===null?"#fff":"#94a3b8",fontSize:12,fontWeight:700,cursor:"pointer"}}>כל הטיול</button>
+            {regionGroups.map((g,i)=>(
+              <button key={i} onClick={()=>{setActiveRegion(i===activeRegion?null:i);setActiveDay(null);setSearch("");}} style={{padding:"6px 13px",borderRadius:20,border:`2px solid ${activeRegion===i?g.color:"#334155"}`,background:activeRegion===i?g.color:"transparent",color:activeRegion===i?"#fff":"#94a3b8",fontSize:12,fontWeight:700,cursor:"pointer"}}>{g.label}</button>
+            ))}
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:11,marginBottom:20}}>
+            {[{val:"31",label:"ימי טיול",icon:"📅",color:"#6366f1"},{val:totalStops,label:"אטרקציות",icon:"📍",color:"#14b8a6"},{val:"4",label:"מדינות",icon:"🌏",color:"#f59e0b"}].map((s,i)=>(
+              <div key={i} style={{background:"#1e293b",border:`2px solid ${s.color}30`,borderRadius:12,padding:12,textAlign:"center"}}>
+                <div style={{fontSize:20}}>{s.icon}</div>
+                <div style={{fontSize:22,fontWeight:900,color:s.color}}>{s.val}</div>
+                <div style={{fontSize:11,color:"#64748b",fontWeight:600}}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+          {filteredDays.length===0
+            ? <div style={{textAlign:"center",color:"#64748b",padding:40,direction:"rtl"}}>לא נמצאו תוצאות עבור "{search}"</div>
+            : filteredDays.map(day=>(
+              <DayCard key={day.date} day={day} isActive={activeDay===day.date}
+                onClick={()=>setActiveDay(activeDay===day.date?null:day.date)}/>
+            ))
+          }
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
+window.__rerender__ = () => root.render(<App />);
+</script>
+</body>
+</html>
