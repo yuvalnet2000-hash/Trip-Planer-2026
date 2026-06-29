@@ -73,7 +73,7 @@ Return ONLY valid JSON like: {"url":"https://..."} — no markdown, no explanati
   }
 }
 
-const days = [
+function getDays() { return [
   { date:"2026-07-10", label:"10 יולי", city:"תל אביב ← דובאי ← בנגקוק", country:"🛫", flag:"🇮🇱", gradType:"city", note:"טיסה FZ1082 | יציאה 15:50, הגעה למחרת 11:25", stops:[] },
   { date:"2026-07-11", label:"11 יולי", city:"בנגקוק", country:"תאילנד", flag:"🇹🇭", gradType:"city", hotel:"Asia Hotel Bangkok", stops:[
     { img: IMGS.mbk, name:"MBK Center Bangkok", displayName:"קניון MBK Center", note:"קניון ענק עם 7 קומות ואלפי חנויות", imgType:"market" },
@@ -226,7 +226,7 @@ const days = [
     { name:"Bangkok Thailand skyline Chao Phraya river", displayName:"יום חופשי בבנגקוק", note:"מנוחה, קניות אחרונות ואוכל תאילנדי לפני הטיסה הביתה", imgType:"city" },
   ]},
   { date:"2026-08-10", label:"10 אוגוסט", city:"בנגקוק ← דובאי ← ישראל 🏠", country:"🛬", flag:"🇮🇱", gradType:"city", note:"טיסה FZ1334 | יציאה 23:50, הגעה 08:45", stops:[] },
-];
+]; }
 
 const countryColors = {
   "תאילנד":    {bg:"#fdf4ff",border:"#ec4899",accent:"#db2777"},
@@ -360,7 +360,7 @@ function App() {
   const [activeRegion, setActiveRegion] = React.useState(null);
   const [search, setSearch] = React.useState("");
 
-  const filteredDays = days.filter(d => {
+  const filteredDays = getDays().filter(d => {
     const regionMatch = activeRegion===null || regionGroups[activeRegion].dates.includes(d.date);
     if (!regionMatch) return false;
     if (!search.trim()) return true;
